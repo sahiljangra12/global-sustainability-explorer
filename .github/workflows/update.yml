@@ -2,8 +2,8 @@ name: Update data, news and site
 
 on:
   schedule:
-    - cron: "17 3 * * 0"     # weekly: check every data source for new releases
-    - cron: "41 */3 * * *"   # every 3 hours: refresh news and redeploy
+    - cron: "17 3 * * 0"     # weekly: full check of every data source
+    - cron: "41 */3 * * *"   # every 3 hours: check sources for new releases, refresh news, redeploy
   workflow_dispatch:
     inputs:
       sources:
@@ -30,9 +30,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 120
     env:
       GH_TOKEN: ${{ github.token }}
+      # Download at most ~50 minutes of new UN series per run. A large backfill continues
+      # on the next run, and progress is published after every run.
+      GSE_UNSDG_MAX_MINUTES: "50"
+      GSE_UNSDG_WORKERS: "6"
     outputs:
       changed: ${{ steps.build.outputs.changed }}
     steps:
@@ -63,10 +67,12 @@ jobs:
       - name: Decide what to check
         id: plan
         run: |
+          # Scheduled runs check every source: unchanged series are reused, so a check is a
+          # handful of small requests. Pushes only rebuild the site (fast deploys).
           SOURCES=""
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SOURCES="${{ inputs.sources }}"
-          elif [ "${{ github.event.schedule }}" = "17 3 * * 0" ]; then
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
             SOURCES="unsdg,wdi,owid"
           fi
           # No previous data at all: everything must be built.
@@ -106,7 +112,7 @@ jobs:
           gh release upload data-latest gse-data.tar.gz --clobber
 
       - name: Archive a dated copy when data changed
-        if: steps.build.outputs.changed == 'true' && steps.plan.outputs.sources != ''
+        if: steps.build.outputs.changed == 'true' && (github.event.schedule == '17 3 * * 0' || github.event_name == 'workflow_dispatch')
         run: |
           TAG="data-$(date -u +%Y-%m-%d-%H%M)"
           gh release create "$TAG" gse-data.tar.gz --title "Data $(date -u +%Y-%m-%d)" \

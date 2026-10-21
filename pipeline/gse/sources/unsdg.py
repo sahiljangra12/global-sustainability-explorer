@@ -226,7 +226,7 @@ def run(ctx) -> SourceResult:
             to_fetch.append(code)
 
     log.info("UN SDG: %d series changed or new, %d unchanged", len(to_fetch), reused)
-    failed = []
+    failed, deferred = [], []
     with ThreadPoolExecutor(max_workers=int(os.environ.get("GSE_UNSDG_WORKERS", "4"))) as ex:
         futs = {}
         for code in to_fetch:
@@ -234,8 +234,8 @@ def run(ctx) -> SourceResult:
         for fut in as_completed(futs):
             code = futs[fut]
             res = fut.result()
-            if res is None:
-                failed.append(code)
+            if res is None or res is DEFERRED:
+                (deferred if res is DEFERRED else failed).append(code)
                 iid = f"unsdg:{code}"
                 if iid in prev_by_ind:  # keep the last good copy
                     frames.append(prev_by_ind[iid])
@@ -284,8 +284,12 @@ def run(ctx) -> SourceResult:
     release = max((r for r in new_releases.values() if r), default="")
     notes = []
     if failed:
-        notes.append(f"{len(failed)} UN SDG series could not be downloaded and kept their previous data: "
-                     + ", ".join(sorted(failed)[:20]))
+        notes.append(f"{len(failed)} UN SDG series could not be downloaded this run (previous data kept "
+                     "where there was any): " + ", ".join(sorted(failed)[:20]))
+    if deferred:
+        notes.append(f"UN SDG backfill in progress: {len(deferred)} series still to download; "
+                     "they are fetched on the next scheduled runs.")
+        log.info("UN SDG: %d series deferred to the next run", len(deferred))
     # Remember which provider reported each series (shown on indicator cards).
     return SourceResult(
         source="unsdg",
@@ -301,10 +305,12 @@ def run(ctx) -> SourceResult:
     )
 
 
+DEFERRED = "deferred"
+
+
 def _fetch_guarded(s, code, deadline):
     if time.time() > deadline:
-        log.warning("UN SDG: time budget used up, skipping %s this run", code)
-        return None
+        return DEFERRED  # time budget for this run used up; fetched on the next run
     try:
         return fetch_series(s, code)
     except Exception as e:  # noqa: BLE001 - one bad series must not stop the run
