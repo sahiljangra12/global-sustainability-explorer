@@ -14,9 +14,6 @@ feeds:
   - name: IPCC
     url: https://www.ipcc.ch/feed/
     kind: official
-  - name: WMO
-    url: https://wmo.int/rss.xml
-    kind: official
   - name: Carbon Brief
     url: https://www.carbonbrief.org/feed/
     kind: specialist

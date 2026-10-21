@@ -338,7 +338,7 @@ function renderDims() {
   const cur = parseDims(state.dims);
   $("#dims").innerHTML = Object.entries(keys).map(([k, vals]) => `<label>${esc(k)}
       <select data-dim="${esc(k)}">${series.dims.includes("") || !cur[k] ? `<option value="">Total / not broken down</option>` : ""}
-      ${[...vals].sort().map((v) => `<option value="${esc(v)}" ${cur[k] === v ? "selected" : ""}>${esc(dimLabel(v))}</option>`).join("")}
+      ${[...vals].sort().map((v) => `<option value="${esc(v)}" ${cur[k] === v ? "selected" : ""}>${esc(dimLabel(v, k, series.dim_labels))}</option>`).join("")}
       </select></label>`).join("");
   $$("#dims select").forEach((s) => s.addEventListener("change", () => {
     const want = {};
@@ -414,7 +414,7 @@ function renderCard() {
         <dt>Code</dt><dd>${esc(ind.c)}</dd>
         <dt>Release</dt><dd>${esc(series.release || "–")}</dd>
         <dt>Coverage</dt><dd>${ind.ng} places, ${ind.y0}–${ind.y1}, ${ind.nr.toLocaleString("en")} values</dd>
-        ${state.dims ? `<dt>Breakdown</dt><dd>${esc(dimsText(state.dims))}</dd>` : ""}
+        ${state.dims ? `<dt>Breakdown</dt><dd>${esc(dimsText(state.dims, series.dim_labels))}</dd>` : ""}
         ${flags}
         <dt>Licence</dt><dd>${esc(series.license || "See source")}</dd>
       </dl>
@@ -679,7 +679,7 @@ function downloadCsv() {
     : currentRows().filter((r) => state.geos.includes(r.geo) && r.year >= state.y0 && r.year <= state.y1);
   const header = ["place", "place_code", "year", "value", "unit", "breakdown", "flag", "indicator", "indicator_code", "source", "release"];
   const lines = [header.join(",")].concat(rows.map((r) => [store.geoName(r.geo), r.geo, r.year, r.value, series.unit,
-    dimsText(r.dims), r.flag, ind.n, ind.c, c.source, c.release].map(csvEscape).join(",")));
+    dimsText(r.dims, series.dim_labels), r.flag, ind.n, ind.c, c.source, c.release].map(csvEscape).join(",")));
   download(`${ind.c.replace(/[^A-Za-z0-9_.-]/g, "_")}.csv`, lines.join("\n"));
 }
 

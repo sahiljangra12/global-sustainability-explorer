@@ -8,6 +8,7 @@ the previous build instead of being downloaded again.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -17,7 +18,7 @@ import pandas as pd
 
 from ..geo import un_code
 from ..http import get_json
-from ..schema import SOURCES, coerce_obs, dims_key, empty_obs
+from ..schema import SOURCES, coerce_obs, dims_key, empty_obs, parse_dims
 from . import SourceResult
 
 log = logging.getLogger(__name__)
@@ -47,6 +48,35 @@ def parse_value(raw) -> tuple[float | None, str]:
     if v != v:  # NaN
         return None, ""
     return v, flag
+
+
+TOTAL_CODES = {"ALLAREA", "BOTHSEX", "ALLAGE", "TOTAL", "_T", "ALL"}
+
+
+def normalize_dims(df: pd.DataFrame) -> pd.DataFrame:
+    """Make the total of each UN series a plain "" breakdown.
+
+    - Values that mean "total" (all areas, both sexes, all ages) are dropped from the key.
+    - A dimension with a single value across the whole series (e.g. Sex=FEMALE for
+      "seats held by women") is not a real breakdown and is dropped too.
+    Idempotent, so it is safe on data reused from earlier builds.
+    """
+    if df.empty or not df["dims"].astype(bool).any():
+        return df
+    out = []
+    for _iid, g in df.groupby("indicator_id", sort=False):
+        parsed = [parse_dims(d) for d in g["dims"]]
+        parsed = [{k: v for k, v in d.items() if v not in TOTAL_CODES} for d in parsed]
+        values: dict[str, set] = {}
+        for d in parsed:
+            for k, v in d.items():
+                values.setdefault(k, set()).add(v)
+        constant = {k for k, vs in values.items()
+                    if len(vs) == 1 and all(k in d for d in parsed)}
+        g = g.copy()
+        g["dims"] = [dims_key({k: v for k, v in d.items() if k not in constant}) for d in parsed]
+        out.append(g.drop_duplicates(["geo", "year", "dims"], keep="first"))
+    return pd.concat(out, ignore_index=True)
 
 
 def rows_to_frame(series_code: str, items: list[dict]) -> tuple[pd.DataFrame, dict]:
@@ -96,7 +126,7 @@ def rows_to_frame(series_code: str, items: list[dict]) -> tuple[pd.DataFrame, di
     df = df.sort_values("_rank").drop_duplicates(["geo", "year", "dims"], keep="first")
     main_unit = max(units, key=units.get) if units else ""
     top_providers = sorted(providers, key=providers.get, reverse=True)[:3]
-    return coerce_obs(df), {"unit": main_unit, "multi_unit": multi_unit,
+    return normalize_dims(coerce_obs(df)), {"unit": main_unit, "multi_unit": multi_unit,
                             "providers": top_providers}
 
 
@@ -104,6 +134,7 @@ def fetch_series(s, code: str) -> tuple[pd.DataFrame, dict, dict]:
     """Download every page of one series. Returns (obs, unit info, unit code descriptions)."""
     items: list[dict] = []
     unit_desc: dict[str, str] = {}
+    dim_desc: dict[str, dict[str, str]] = {}
     page = 1
     while True:
         js = get_json(s, f"{BASE}/Series/Data",
@@ -114,11 +145,19 @@ def fetch_series(s, code: str) -> tuple[pd.DataFrame, dict, dict]:
             if att.get("id") == "Units":
                 for c in att.get("codes") or []:
                     unit_desc[c.get("code")] = c.get("description")
+        for dim in js.get("dimensions") or []:
+            if dim.get("id") in DROP_DIMS:
+                continue
+            labels = dim_desc.setdefault(dim.get("id"), {})
+            for c in dim.get("codes") or []:
+                if c.get("code") and c.get("description"):
+                    labels[c["code"]] = c["description"]
         total_pages = js.get("totalPages") or 1
         if page >= total_pages:
             break
         page += 1
     df, info = rows_to_frame(code, items)
+    info["dim_labels"] = dim_desc
     return df, info, unit_desc
 
 
@@ -151,6 +190,7 @@ def run(ctx) -> SourceResult:
     prev_releases: dict = prev_state.get("series_release", {})
     prev_units: dict = prev_state.get("series_units", {})
     prev_providers: dict = prev_state.get("series_providers", {})
+    prev_dimlabels: dict = prev_state.get("series_dim_labels", {})
     prev_obs = ctx.prev_obs("unsdg")
     deadline = time.time() + float(os.environ.get("GSE_UNSDG_MAX_MINUTES", "240")) * 60
 
@@ -169,16 +209,18 @@ def run(ctx) -> SourceResult:
         prev_by_ind = {k: v for k, v in prev_obs.groupby("indicator_id", sort=False)}
 
     frames, ind_rows = [], []
-    new_releases, new_units, new_providers = {}, {}, {}
+    new_releases, new_units, new_providers, new_dimlabels = {}, {}, {}, {}
     to_fetch, fetched, reused = [], 0, 0
     for sr in series_list:
         code = sr["code"]
         iid = f"unsdg:{code}"
-        if prev_releases.get(code) == sr.get("release") and iid in prev_by_ind:
+        if (prev_releases.get(code) == sr.get("release") and iid in prev_by_ind
+                and code in prev_dimlabels):
             frames.append(prev_by_ind[iid])
             new_releases[code] = sr.get("release")
             new_units[code] = prev_units.get(code, "")
             new_providers[code] = prev_providers.get(code, [])
+            new_dimlabels[code] = prev_dimlabels.get(code, {})
             reused += 1
         else:
             to_fetch.append(code)
@@ -200,6 +242,7 @@ def run(ctx) -> SourceResult:
                     new_releases[code] = prev_releases.get(code)
                     new_units[code] = prev_units.get(code, "")
                     new_providers[code] = prev_providers.get(code, [])
+                    new_dimlabels[code] = prev_dimlabels.get(code, {})
                 continue
             df, info, unit_desc = res
             frames.append(df)
@@ -207,6 +250,7 @@ def run(ctx) -> SourceResult:
             new_releases[code] = sr.get("release")
             new_units[code] = unit_desc.get(info.get("unit"), info.get("unit", ""))
             new_providers[code] = info.get("providers", [])
+            new_dimlabels[code] = info.get("dim_labels", {})
             fetched += 1
             if fetched % 25 == 0:
                 log.info("UN SDG: fetched %d/%d", fetched, len(to_fetch))
@@ -233,9 +277,10 @@ def run(ctx) -> SourceResult:
             "source_url": f"https://unstats.un.org/sdgs/dataportal/database?seriesCode={code}",
             "license": SOURCES["unsdg"]["license"],
             "release": sr.get("release") or "",
+            "dim_labels": json.dumps(new_dimlabels.get(code) or {}, ensure_ascii=False),
         })
 
-    obs = pd.concat(frames, ignore_index=True) if frames else empty_obs()
+    obs = normalize_dims(pd.concat(frames, ignore_index=True)) if frames else empty_obs()
     release = max((r for r in new_releases.values() if r), default="")
     notes = []
     if failed:
@@ -248,7 +293,7 @@ def run(ctx) -> SourceResult:
         indicators=pd.DataFrame(ind_rows),
         release=release,
         state={"series_release": new_releases, "series_units": new_units,
-               "series_providers": new_providers},
+               "series_providers": new_providers, "series_dim_labels": new_dimlabels},
         fetched=fetched,
         reused=reused,
         notes=notes,

@@ -110,11 +110,13 @@ const DIM_LABELS = {
   FEMALE: "Female", MALE: "Male", BOTHSEX: "Both sexes", ALLAREA: "All areas", URBAN: "Urban",
   RURAL: "Rural", ALLAGE: "All ages",
 };
-export function dimLabel(v) {
+export function dimLabel(v, key, labels) {
+  const fromSource = labels?.[key]?.[v];
+  if (fromSource) return fromSource;
   return DIM_LABELS[v] || v.replace(/_/g, " ").replace(/^(\d+)-(\d+)$/, "$1–$2");
 }
-export function dimsText(d) {
+export function dimsText(d, labels) {
   const o = parseDims(d);
-  const parts = Object.entries(o).map(([k, v]) => `${k}: ${dimLabel(v)}`);
+  const parts = Object.entries(o).map(([k, v]) => `${k}: ${dimLabel(v, k, labels)}`);
   return parts.length ? parts.join(", ") : "Total";
 }

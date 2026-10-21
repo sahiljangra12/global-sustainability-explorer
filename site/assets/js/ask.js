@@ -307,7 +307,7 @@ export async function askLocal(store, question, opts = {}) {
   const plan = { geos, intent, dims, y0: years.y0 ?? null, y1: years.y1 ?? null,
     single: !!years.single, lastN: years.lastN };
   const res = computeAnswer(store, ind, series, plan);
-  const interp = `${esc(ind.n)}${dims ? ` · ${esc(dimsText(dims))}` : ""}`;
+  const interp = `${esc(ind.n)}${dims ? ` · ${esc(dimsText(dims, series.dim_labels))}` : ""}`;
   return {
     ...res,
     indicator: ind.id,

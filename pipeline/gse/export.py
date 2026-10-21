@@ -74,6 +74,7 @@ def write_series(out: Path, ind: dict, frame: pd.DataFrame, updated: str) -> dic
         "license": ind.get("license") or "",
         "release": ind.get("release") or "",
         "updated": updated,
+        "dim_labels": _labels(ind.get("dim_labels")),
         "geos": geos,
         "dims": dims,
         "flags": flags,
@@ -157,6 +158,15 @@ def export_parquet(out: Path, obs: pd.DataFrame, indicators: pd.DataFrame, geo: 
         ind[c] = ind[c].apply(_listify)
     ind.to_parquet(out / "indicators.parquet", index=False, compression="zstd")
     _dump(out / "geo.json", list(geo.values()))
+
+
+def _labels(v) -> dict:
+    if isinstance(v, dict):
+        return v
+    try:
+        return json.loads(v) if isinstance(v, str) and v else {}
+    except ValueError:
+        return {}
 
 
 def _dump(path: Path, obj) -> None:

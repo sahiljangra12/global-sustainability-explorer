@@ -155,3 +155,23 @@ def test_diff_detects_revisions_and_new_years():
     d = diff(prev, new)
     assert d["revised_values"] == 1 and d["added_rows"] == 1
     assert d["changed"]["x:a"]["new_latest_year"] == 2022
+
+
+def test_normalize_un_totals():
+    rows = []
+    for d in ("Location=ALLAREA", "Location=URBAN", "Location=RURAL"):
+        rows.append({"indicator_id": "unsdg:EG_ACS_ELEC", "geo": "IND", "year": 2020, "value": 1.0,
+                     "dims": d, "flag": ""})
+    rows.append({"indicator_id": "unsdg:SG_GEN_PARL", "geo": "IND", "year": 2020, "value": 14.9,
+                 "dims": "Sex=FEMALE", "flag": ""})
+    for d in ("Age=ALLAGE;Location=ALLAREA;Sex=BOTHSEX", "Age=ALLAGE;Location=ALLAREA;Sex=FEMALE",
+              "Age=65+;Location=ALLAREA;Sex=BOTHSEX"):
+        rows.append({"indicator_id": "unsdg:SI_POV_DAY1", "geo": "IND", "year": 2020, "value": 2.0,
+                     "dims": d, "flag": ""})
+    out = unsdg.normalize_dims(pd.DataFrame(rows))
+    got = {k: sorted(g.dims) for k, g in out.groupby("indicator_id")}
+    assert got["unsdg:EG_ACS_ELEC"] == ["", "Location=RURAL", "Location=URBAN"]
+    assert got["unsdg:SG_GEN_PARL"] == [""]
+    assert got["unsdg:SI_POV_DAY1"] == ["", "Age=65+", "Sex=FEMALE"]
+    again = unsdg.normalize_dims(out)
+    assert sorted(again.dims) == sorted(out.dims)

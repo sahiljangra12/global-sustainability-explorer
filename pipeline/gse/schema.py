@@ -33,6 +33,7 @@ INDICATOR_COLUMNS = [
     "source_url",
     "license",
     "release",  # the source's own version / release label / last-updated date
+    "dim_labels",  # JSON {dimension: {code: description}} for breakdown codes, "{}" if none
 ]
 
 SOURCES = {
