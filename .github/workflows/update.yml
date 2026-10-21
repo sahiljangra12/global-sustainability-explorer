@@ -122,6 +122,7 @@ jobs:
         run: |
           cp -r site _site
           cp -r build/site-data _site/data
+          python tools/stamp_assets.py _site "${GITHUB_SHA::8}-${GITHUB_RUN_NUMBER}"
           du -sh _site
 
       - uses: actions/upload-pages-artifact@v3

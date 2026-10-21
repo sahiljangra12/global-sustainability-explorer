@@ -43,7 +43,7 @@ async function init() {
   $("#ind-search").placeholder = `Search ${store.indicators.length.toLocaleString("en")} indicators`;
   const nCountries = store.geo.filter((g) => g.type === "country").length;
   if (store.meta) {
-    $("#hero-lede").innerHTML = `<b>${store.meta.indicators.toLocaleString("en")} indicators</b> and <b>${store.meta.rows.toLocaleString("en")} values</b> for <b>${nCountries} countries and territories</b>, from the UN SDG Global Database, the World Bank and Our World in Data. Checked for new releases every week. Pick a goal to start.`;
+    $("#hero-lede").innerHTML = `<b>${store.meta.indicators.toLocaleString("en")} indicators</b> and <b>${store.meta.rows.toLocaleString("en")} values</b> for <b>${nCountries} countries and territories</b>, from the UN SDG Global Database, the World Bank and Our World in Data. Checked for new releases every few hours. Pick a goal to start.`;
   }
   if (store.meta?.generated) $("#build-time").textContent = `Data last built ${dateText(store.meta.generated)}.`;
   renderGoalStrip();
