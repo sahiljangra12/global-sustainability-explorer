@@ -14,6 +14,9 @@ year years please do does did between top highest lowest least best worst rank r
 there share has have had all its it per capita than more less then`.split(/\s+/));
 
 const KEEP_IN_NAME = new Set(["per", "capita", "share", "rate"]);
+// Words that pick a breakdown (rural, female...) rather than the measure itself.
+const BREAKDOWN_WORDS = new Set(["urban", "rural", "female", "male", "women", "men", "sex", "age",
+  "location", "area", "areas"]);
 
 const SYNONYMS = {
   renewables: ["renewable"], renewable: ["renewable"], emissions: ["emission", "emissions"],
@@ -27,6 +30,8 @@ const SYNONYMS = {
   mortality: ["mortality"], deaths: ["mortality", "deaths"], temperature: ["temperature"],
   warming: ["temperature"], parliament: ["parliaments", "seats"], gdp: ["gdp"],
   population: ["population"], marine: ["marine"], ocean: ["marine", "ocean"],
+  person: ["capita", "person"], head: ["capita"], people: ["population", "people"],
+  cooking: ["cooking", "clean", "fuel"], fuels: ["fuel"],
   protected: ["protected"], biodiversity: ["biodiversity", "protected", "species"],
 };
 
@@ -91,7 +96,9 @@ export function scoreIndicators(store, question, geoWords) {
   let tokens = q.split(" ").filter((w) => w && !geoSet.has(w) && !/^\d{4}$/.test(w));
   const wantsPerCapita = /per capita|per person|per head/.test(q);
   const wantsShare = /\bshare\b|\bpercent|%|proportion/.test(q);
-  tokens = tokens.filter((w) => !STOP.has(w) || KEEP_IN_NAME.has(w));
+  tokens = tokens.filter((w) => (!STOP.has(w) || KEEP_IN_NAME.has(w)) && !BREAKDOWN_WORDS.has(w));
+  // "women in parliament" is about the measure, not a breakdown: keep it when nothing else is left
+  if (!tokens.length && /\bwomen\b/.test(q)) tokens = ["women"];
   const expanded = [];
   tokens.forEach((w) => {
     const s = stem(w);
@@ -151,8 +158,8 @@ function resolveWorld(code, series) {
   return series.geos.find((g) => /World/.test(g)) || "UN-001";
 }
 
-function expandRegion(store, code, series) {
-  if (series.geos.includes(code)) return [code];
+function expandRegion(store, code, series, wantMembers = false) {
+  if (series.geos.includes(code) && !wantMembers) return [code];
   const g = store.geoByCode.get(code);
   if (g && g.members && g.members.length) {
     const have = g.members.filter((m) => series.geos.includes(m));
@@ -207,18 +214,20 @@ export function computeAnswer(store, ind, series, plan) {
     const best = Math.max(0, ...counts.values());
     const yr = [...counts.entries()].filter(([y, c]) => c >= best * 0.6 && y <= y1)
       .map(([y]) => y).sort((a, b) => b - a)[0];
-    const vals = candidates.map((g) => (byGeo.get(g) || []).find((r) => r.year === yr))
+    const all = candidates.map((g) => (byGeo.get(g) || []).find((r) => r.year === yr))
       .filter(Boolean)
-      .sort((a, b) => (plan.intent.dir === "asc" ? a.value - b.value : b.value - a.value))
-      .slice(0, plan.intent.n);
+      .sort((a, b) => (plan.intent.dir === "asc" ? a.value - b.value : b.value - a.value));
+    const vals = all.slice(0, plan.intent.n);
+    const ties = all.length ? all.filter((r) => r.value === all[0].value).length : 0;
     if (!vals.length) return { ok: false, text: "No country values are available for that indicator." };
     const nC = counts.get(yr);
     lines.push(`<p>${plan.intent.dir === "asc" ? "Lowest" : "Highest"} ${vals.length === 1 ? "value" : `${vals.length} countries`} in ${yr}, out of ${nC} ${nC === 1 ? "country" : "countries"} with data:</p><ol class="rank">` +
       vals.map((r) => {
         used.push(r);
         flagged ||= !!r.flag;
-        return `<li><span>${esc(name(r.geo))}</span><b>${fmt(r.value, unit)}</b></li>`;
-      }).join("") + "</ol>");
+        return `<li><span>${esc(name(r.geo))}</span><b>${fmt(r.value, unit)}${unitSuffix(unit)}</b></li>`;
+      }).join("") + "</ol>" +
+      (ties > 1 && ties >= vals.length ? `<p>${ties} countries share the ${plan.intent.dir === "asc" ? "lowest" : "highest"} value (${fmt(all[0].value, unit)}${unitSuffix(unit)}), so the order above is alphabetical. Try the lowest values instead, or a narrower question.</p>` : ""));
     return { ok: true, html: lines.join(""), used, flagged, view: { geos: vals.map((v) => v.geo), y0: yr, y1: yr, mode: "chart" } };
   }
 
@@ -278,7 +287,7 @@ export function computeAnswer(store, ind, series, plan) {
 
 function flagText(f) {
   return { E: "estimate", M: "modelled", "<": "below this value", ">": "above this value",
-    G: "global monitoring data", C: "country data", CA: "country-adjusted" }[f] || f;
+    G: "global monitoring data", C: "country data", CA: "country-adjusted", N: "non-relevant" }[f] || f;
 }
 
 export async function askLocal(store, question, opts = {}) {
@@ -299,19 +308,43 @@ export async function askLocal(store, question, opts = {}) {
   const alternatives = scored.slice(1, 4).map((s) => s.ind.id);
   const ind = scored[0].ind;
   const series = await store.series(ind.id);
-  let geos = rawGeos.map((g) => resolveWorld(g, series)).flatMap((g) => expandRegion(store, g, series));
+  const wantMembers = /\bcountries\b|\beach country\b/.test(q) && rawGeos.length === 1;
+  let geos = rawGeos.map((g) => resolveWorld(g, series)).flatMap((g) => expandRegion(store, g, series, wantMembers));
   geos = [...new Set(geos)].slice(0, 25);
   const intent = intentOf(q, geos, years);
-  if (!geos.length && intent.kind !== "rank") geos = [resolveWorld("WORLD", series)];
+  if (!geos.length && intent.kind !== "rank") {
+    const w = resolveWorld("WORLD", series);
+    if (series.geos.includes(w)) geos = [w];
+    else if (series.geos.filter((g) => store.geoByCode.get(g)?.type === "country").length >= 10) {
+      intent.kind = "rank"; intent.dir = "desc"; intent.n = 10;
+    } else geos = series.geos.slice(0, 12);
+  }
   const dims = pickDims(series, question);
   const plan = { geos, intent, dims, y0: years.y0 ?? null, y1: years.y1 ?? null,
     single: !!years.single, lastN: years.lastN };
-  const res = computeAnswer(store, ind, series, plan);
-  const interp = `${esc(ind.n)}${dims ? ` · ${esc(dimsText(dims, series.dim_labels))}` : ""}`;
+  const pairs = [["urban", "rural"], ["female", "male"]];
+  const pair = pairs.find(([a, b]) => new RegExp(`\\b${a}\\b`).test(q) && new RegExp(`\\b${b}\\b`).test(q));
+  let res;
+  if (pair && plan.intent.kind !== "rank") {
+    const parts = pair.map((w) => series.dims.find((x) => new RegExp(`=${w}$|=${w};`, "i").test(x))).filter(Boolean);
+    if (parts.length === 2) {
+      const subs = parts.map((d) => ({ d, r: computeAnswer(store, ind, series, { ...plan, dims: d }) }));
+      res = {
+        ok: subs.some((x) => x.r.ok),
+        html: subs.map((x) => `<p><b>${esc(dimsText(x.d, series.dim_labels))}</b></p>${x.r.html || ""}`).join(""),
+        used: subs.flatMap((x) => x.r.used || []),
+        flagged: subs.some((x) => x.r.flagged),
+        view: subs[0].r.view,
+      };
+      plan.dims = parts[0];
+    }
+  }
+  res ||= computeAnswer(store, ind, series, plan);
+  const interp = `${esc(ind.n)}${plan.dims ? ` · ${esc(dimsText(plan.dims, series.dim_labels))}` : ""}`;
   return {
     ...res,
     indicator: ind.id,
-    dims,
+    dims: plan.dims,
     alternatives,
     interp,
     citation: citation(ind, series),

@@ -400,7 +400,11 @@ function stopPlay() {
 function renderCard() {
   const ind = store.byId.get(state.ind);
   const cite = citation(ind, series);
-  const flags = series.flags?.length ? `<dt>Flags</dt><dd>${series.flags.map(esc).join(", ")} (shown with * in the table)</dd>` : "";
+  const FLAGS = { E: "estimated", M: "modelled", C: "country data", CA: "country-adjusted data",
+    G: "global monitoring data", N: "non-relevant", "<": "below the value shown", ">": "above the value shown" };
+  const flags = series.flags?.length
+    ? `<dt>Flags</dt><dd>${series.flags.map((f) => `${esc(f)} = ${esc(FLAGS[f] || "source flag")}`).join("; ")} (marked * in the table)</dd>`
+    : "";
   $("#ind-card").innerHTML = `
     <div>
       <h2>About this indicator</h2>

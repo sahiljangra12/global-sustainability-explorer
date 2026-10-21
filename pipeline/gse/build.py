@@ -107,11 +107,9 @@ def main(argv=None):
     prev_obs, prev_ind, prev_state, prev_geo, changelog, updated, prev_tree = load_prev(args.prev)
     s = session()
     wanted = [x.strip() for x in args.sources.split(",") if x.strip()]
-    if not wanted and prev_geo:
-        # Re-export only (e.g. a news refresh): reuse everything from the previous build.
-        geo, notes = {r["code"]: r for r in prev_geo}, []
-    else:
-        geo, notes = build_geography(s, prev_geo)
+    # Geography is two small requests, so it is refreshed on every run (falls back to the
+    # previous build's geography if the UN API is unreachable).
+    geo, notes = build_geography(s, prev_geo)
     ctx = Context(session=s, geo=geo, prev_state=prev_state, prev_all=prev_obs,
                   prev_indicators=prev_ind)
 

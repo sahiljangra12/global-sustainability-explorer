@@ -84,6 +84,16 @@ DISPLAY_NAMES = {
     "VAT": "Holy See",
 }
 
+# Everyday names for UN M49 regions (so "South Asia" means the UN region, not one source's aggregate).
+REGION_ALIASES = {
+    34: ["South Asia"], 30: ["East Asia"], 35: ["Southeast Asia", "South East Asia"],
+    145: ["West Asia", "Middle East"], 143: ["Central Asia"], 202: ["Sub-Saharan Africa", "SSA"],
+    15: ["North Africa"], 21: ["North America"], 419: ["Latin America", "LAC"],
+    5: ["South America"], 150: ["Europe"], 154: ["North Europe"], 39: ["South Europe"],
+    151: ["East Europe"], 155: ["West Europe"], 9: ["Oceania"], 2: ["Africa"], 142: ["Asia"],
+    19: ["Americas"], 29: ["Caribbean"], 13: ["Central America"], 53: ["Australia and NZ"],
+}
+
 CONTINENTAL_ROOT = "World (total) by continental regions"
 SDG_ROOT = "World (total) by SDG regions"
 GROUP_ROOTS = {
@@ -184,7 +194,7 @@ def build_geo(un_tree: list[dict], wb_countries: list[dict] | None = None) -> di
             code = f"UN-{m49:03d}"
             geo[code] = {"code": code, "name": node["geoAreaName"], "type": "region",
                          "m49": m49, "parent": parent_code, "level": len(parents),
-                         "aliases": [], "members": []}
+                         "aliases": list(REGION_ALIASES.get(m49, [])), "members": []}
 
     # 2. SDG regions (a second regional grouping used in UN SDG reports).
     sdg = roots.get(SDG_ROOT)
@@ -203,7 +213,9 @@ def build_geo(un_tree: list[dict], wb_countries: list[dict] | None = None) -> di
             code = f"UN-{int(node['geoAreaCode']):03d}"
             geo.setdefault(code, {"code": code, "name": node["geoAreaName"], "type": "region",
                                   "m49": int(node["geoAreaCode"]), "parent": "UN-001",
-                                  "level": len(parents), "aliases": [], "members": []})
+                                  "level": len(parents),
+                                  "aliases": list(REGION_ALIASES.get(int(node["geoAreaCode"]), [])),
+                                  "members": []})
 
     # 3. Cross-cutting UN groups (LDC, LLDC, SIDS).
     for root_name, short in GROUP_ROOTS.items():

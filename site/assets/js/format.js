@@ -21,7 +21,7 @@ export function fmt(v, unit) {
 }
 
 export function unitSuffix(unit) {
-  if (!unit || isPercent(unit)) return "";
+  if (!unit || isPercent(unit) || /^(number|count|index)$/i.test(unit.trim())) return "";
   return " " + unit;
 }
 
