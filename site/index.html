@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Global Sustainability Explorer</title>
-  <meta name="description" content="Explore, compare and cite global sustainability data: UN SDG indicators, World Bank and Our World in Data, updated automatically, with live sustainability news.">
+  <meta name="description" content="Explore, compare and cite global sustainability data for all 17 SDGs: UN SDG indicators, World Bank and Our World in Data, updated automatically, with live sustainability news.">
+  <meta name="theme-color" content="#FFFFFF">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
-  <script src="assets/config.js"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -22,45 +22,32 @@
       </a>
       <nav class="tabs" aria-label="Sections">
         <a href="#explore" data-tab="explore">Explore</a>
-        <a href="#news" data-tab="news">News <span class="live-dot" hidden></span></a>
+        <a href="#news" data-tab="news">News <span class="live-dot" hidden title="A UN conference is happening now"></span></a>
         <a href="#updates" data-tab="updates">What's new</a>
         <a href="#about" data-tab="about">About</a>
       </nav>
     </div>
+    <div class="spectrum" aria-hidden="true"></div>
   </header>
 
   <main id="main">
     <!-- EXPLORE -->
     <section id="tab-explore" class="tab" aria-label="Explore data">
-      <div class="ask-band">
+      <section class="hero">
         <div class="wrap">
-          <form id="ask-form" class="ask" autocomplete="off">
-            <label for="ask-input" class="ask-label">Ask the data</label>
-            <div class="ask-row">
-              <input id="ask-input" name="q" type="text" placeholder="e.g. Renewable energy share in India vs China since 2010" aria-describedby="ask-help">
-              <button type="submit">Ask</button>
-            </div>
-            <p id="ask-help" class="ask-help">Answers come only from the database and every number is cited. Try:
-              <button type="button" class="example">CO2 emissions per capita in the United States since 1990</button>
-              <button type="button" class="example">Top 10 countries for access to electricity</button>
-              <button type="button" class="example">Forest area in Brazil vs Indonesia</button>
-            </p>
-          </form>
-          <div id="answer" class="answer" hidden aria-live="polite"></div>
+          <h1 class="hero-title">Seventeen goals.<br>Every country. One place.</h1>
+          <p class="hero-lede" id="hero-lede">Official SDG indicators, World Bank and Our World in Data series, checked for new releases every week. Pick a goal to start.</p>
+          <div class="goal-grid" role="tablist" aria-label="Sustainable Development Goals" id="goal-strip"></div>
         </div>
-      </div>
+      </section>
 
-      <div class="wrap">
-        <div class="goal-strip" role="tablist" aria-label="Sustainable Development Goals" id="goal-strip"></div>
-      </div>
-
-      <div class="wrap explore">
+      <div class="wrap explore" id="explorer">
         <aside class="filters" id="filters" aria-label="Filters">
           <button class="filters-toggle" type="button" aria-expanded="false" aria-controls="filters-body">Filters</button>
           <div id="filters-body" class="filters-body">
             <section class="f-block">
               <h2>Indicator</h2>
-              <input id="ind-search" type="search" placeholder="Search 1,000+ indicators" aria-label="Search indicators">
+              <input id="ind-search" type="search" placeholder="Search indicators" aria-label="Search indicators">
               <div id="ind-browser" class="ind-browser"></div>
             </section>
             <section class="f-block">
@@ -95,26 +82,28 @@
         <section class="result" aria-label="Result">
           <header class="result-head">
             <p class="result-goal" id="result-goal"></p>
-            <h1 id="ind-title" class="ind-title">Loading data…</h1>
+            <h2 id="ind-title" class="ind-title">Loading data…</h2>
             <p class="ind-meta" id="ind-meta"></p>
           </header>
-          <div class="toolbar">
-            <div class="seg" role="tablist" aria-label="View">
-              <button type="button" role="tab" data-view="chart" aria-selected="true">Chart</button>
-              <button type="button" role="tab" data-view="map">Map</button>
-              <button type="button" role="tab" data-view="table">Table</button>
+          <div class="panel">
+            <div class="toolbar">
+              <div class="seg" role="tablist" aria-label="View">
+                <button type="button" role="tab" data-view="chart" aria-selected="true">Chart</button>
+                <button type="button" role="tab" data-view="map">Map</button>
+                <button type="button" role="tab" data-view="table">Table</button>
+              </div>
+              <div class="actions">
+                <button type="button" id="dl-csv">Download CSV</button>
+                <button type="button" id="copy-link">Copy link</button>
+                <button type="button" id="copy-cite">Copy citation</button>
+              </div>
             </div>
-            <div class="actions">
-              <button type="button" id="dl-csv">Download CSV</button>
-              <button type="button" id="copy-link">Copy link</button>
-              <button type="button" id="copy-cite">Copy citation</button>
+            <div id="view" class="view"></div>
+            <div id="map-controls" class="map-controls" hidden>
+              <button type="button" id="map-play" aria-label="Play through the years">Play</button>
+              <input id="map-year" type="range" aria-label="Map year">
+              <output id="map-year-out"></output>
             </div>
-          </div>
-          <div id="view" class="view"></div>
-          <div id="map-controls" class="map-controls" hidden>
-            <button type="button" id="map-play" aria-label="Play through the years">Play</button>
-            <input id="map-year" type="range" aria-label="Map year">
-            <output id="map-year-out"></output>
           </div>
           <section class="ind-card" id="ind-card"></section>
         </section>
@@ -123,10 +112,14 @@
 
     <!-- NEWS -->
     <section id="tab-news" class="tab" hidden aria-label="Sustainability news">
-      <div class="wrap news-layout">
-        <div>
+      <div class="page-band">
+        <div class="wrap">
           <h1 class="page-title">Sustainability news</h1>
           <p class="page-lede" id="news-lede">Headlines from UN and specialist newsrooms, refreshed every few hours. Each item links to the original.</p>
+        </div>
+      </div>
+      <div class="wrap news-layout">
+        <div>
           <div class="news-filters" id="news-filters"></div>
           <ol class="news-list" id="news-list"></ol>
         </div>
@@ -141,9 +134,13 @@
 
     <!-- UPDATES -->
     <section id="tab-updates" class="tab" hidden aria-label="What's new in the data">
+      <div class="page-band">
+        <div class="wrap">
+          <h1 class="page-title">What's new in the data</h1>
+          <p class="page-lede">Every source is checked on a schedule and only what changed is downloaded again. Each entry below is one update.</p>
+        </div>
+      </div>
       <div class="wrap narrow">
-        <h1 class="page-title">What's new in the data</h1>
-        <p class="page-lede">The database checks every source on a schedule and only re-downloads what changed. Each entry below is one update.</p>
         <div id="sources-status"></div>
         <ol id="changelog" class="changelog"></ol>
       </div>
@@ -151,13 +148,20 @@
 
     <!-- ABOUT -->
     <section id="tab-about" class="tab" hidden aria-label="About">
+      <div class="page-band">
+        <div class="wrap">
+          <h1 class="page-title">About this explorer</h1>
+          <p class="page-lede">A free tool for researchers to find, compare and cite global sustainability data in one place.</p>
+        </div>
+      </div>
       <div class="wrap narrow prose" id="about"></div>
     </section>
   </main>
 
   <footer class="foot">
-    <div class="wrap">
-      <p>Built by Sahil. Data: UN SDG Global Database, World Bank WDI, Our World in Data, each under its own licence. <a href="https://github.com/sahiljangra12/global-sustainability-explorer">Source code</a></p>
+    <div class="spectrum" aria-hidden="true"></div>
+    <div class="wrap foot-row">
+      <p>Built by Sahil. Data: UN SDG Global Database, World Bank WDI and Our World in Data, each under its own licence. <a href="https://github.com/sahiljangra12/global-sustainability-explorer">Source code</a></p>
       <p id="build-time"></p>
     </div>
   </footer>

@@ -1,15 +1,7 @@
 import { Store, SDG_COLORS, SOURCE_NAMES, normalize, dimsText, parseDims, dimLabel } from "./data.js";
-import { askLocal, askApi, citation } from "./ask.js";
 import { chart, map, table, bestMapYear, SERIES_COLORS } from "./views.js";
 import { fmt, esc, csvEscape, download, dateText, luminance } from "./format.js";
 
-const CONFIG = window.GSE_CONFIG || {};
-const SHORT_GOALS = {
-  1: "No poverty", 2: "Zero hunger", 3: "Good health", 4: "Education", 5: "Gender equality",
-  6: "Clean water", 7: "Clean energy", 8: "Decent work", 9: "Industry", 10: "Inequalities",
-  11: "Cities", 12: "Consumption", 13: "Climate action", 14: "Life below water",
-  15: "Life on land", 16: "Peace & justice", 17: "Partnerships",
-};
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
@@ -24,6 +16,17 @@ const state = {
   dims: "",
   mapYear: null,
 };
+function citation(ind, series) {
+  return {
+    source: SOURCE_NAMES[ind.s] || ind.s,
+    org: series.source_org,
+    code: ind.c,
+    release: series.release || ind.rel,
+    url: series.source_url,
+    updated: series.updated,
+  };
+}
+
 let store;
 let series = null;
 let playTimer = null;
@@ -38,6 +41,10 @@ init().catch((e) => {
 async function init() {
   store = await new Store().init();
   $("#ind-search").placeholder = `Search ${store.indicators.length.toLocaleString("en")} indicators`;
+  const nCountries = store.geo.filter((g) => g.type === "country").length;
+  if (store.meta) {
+    $("#hero-lede").innerHTML = `<b>${store.meta.indicators.toLocaleString("en")} indicators</b> and <b>${store.meta.rows.toLocaleString("en")} values</b> for <b>${nCountries} countries and territories</b>, from the UN SDG Global Database, the World Bank and Our World in Data. Checked for new releases every week. Pick a goal to start.`;
+  }
   if (store.meta?.generated) $("#build-time").textContent = `Data last built ${dateText(store.meta.generated)}.`;
   renderGoalStrip();
   bindControls();
@@ -113,12 +120,19 @@ function renderGoalStrip() {
   const el = $("#goal-strip");
   const counts = new Map();
   store.indicators.forEach((i) => (i.g || []).forEach((g) => counts.set(g, (counts.get(g) || 0) + 1)));
+  const textOn = (hex) => (luminance(hex) > 0.38 ? "#14213D" : "#fff");
   el.innerHTML =
     `<button class="goal all" role="tab" aria-selected="${!state.goal}" data-goal="">` +
-    `<span class="num">All</span><span class="gname">goals</span></button>` +
-    store.goals.map((g) => `<button class="goal" role="tab" style="--c:${SDG_COLORS[g.code]};color:${luminance(SDG_COLORS[g.code]) > 0.38 ? "#132A2E" : "#fff"}" aria-selected="${state.goal === g.code}"
-        data-goal="${g.code}" title="Goal ${g.code}: ${esc(g.name)} (${counts.get(g.code) || 0} indicators)">
-        <span class="num">${g.code}</span><span class="gname">${esc(SHORT_GOALS[g.code] || g.name)}</span></button>`).join("");
+    `<span class="tint"></span><span class="num">All</span><span class="gname">All 17 goals</span>` +
+    `<span class="count">${store.indicators.length.toLocaleString("en")} indicators</span></button>` +
+    store.goals.map((g) => {
+      const c = SDG_COLORS[g.code];
+      const n = counts.get(g.code) || 0;
+      return `<button class="goal" role="tab" style="--c:${c};color:${textOn(c)}" aria-selected="${state.goal === g.code}"
+        data-goal="${g.code}" title="Goal ${g.code}: ${esc(g.title || g.name)}">
+        <span class="num">${g.code}</span><span class="gname">${esc(g.name)}</span>
+        <span class="count">${n ? `${n} indicator${n === 1 ? "" : "s"}` : "Coming with the next update"}</span></button>`;
+    }).join("");
   $$(".goal", el).forEach((b) => b.addEventListener("click", () => {
     state.goal = b.dataset.goal || null;
     $("#ind-search").value = "";
@@ -133,6 +147,7 @@ function renderGoalStrip() {
       }
     }
     writeHash();
+    $("#explorer").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }));
 }
 
@@ -190,7 +205,7 @@ function renderBrowser() {
   } else {
     el.innerHTML = store.goals.map((g) => {
       const n = store.indicatorsForGoal(g.code).length;
-      return `<details data-goal="${g.code}"><summary>${g.code}. ${esc(g.name)} <small>(${n})</small></summary></details>`;
+      return `<details data-goal="${g.code}"><summary><span class="dot" style="background:${SDG_COLORS[g.code]}"></span>${g.code}. ${esc(g.name)} <small>(${n})</small></summary></details>`;
     }).join("") + (() => {
       const none = store.indicators.filter((i) => !(i.g || []).length);
       return none.length ? `<details data-goal="none"><summary>Other context indicators <small>(${none.length})</small></summary></details>` : "";
@@ -284,9 +299,12 @@ function render() {
   const ind = store.byId.get(state.ind);
   const goal = state.goal && (ind.g || []).includes(state.goal) ? state.goal : (ind.g || [])[0];
   const goalInfo = store.goals.find((g) => g.code === goal);
-  $("#result-goal").innerHTML = goalInfo
-    ? `<span class="sq"></span>Goal ${goal}: ${esc(goalInfo.name)}${ind.i?.length ? ` · indicator ${esc(ind.i.join(", "))}` : ""}${ind.m === "approximate" ? " · related indicator" : ""}`
+  const badge = $("#result-goal");
+  badge.innerHTML = goalInfo
+    ? `Goal ${goal}: ${esc(goalInfo.name)}${ind.i?.length ? ` · indicator ${esc(ind.i.join(", "))}` : ""}${ind.m === "approximate" ? " · related indicator" : ""}`
     : "Context indicator";
+  badge.classList.toggle("light", !!goalInfo && luminance(SDG_COLORS[goal]) > 0.38);
+  badge.classList.toggle("neutral", !goalInfo);
   $("#ind-title").textContent = ind.n;
   $("#ind-meta").textContent = [
     series.unit ? `Unit: ${series.unit}` : null,
@@ -310,10 +328,11 @@ function renderChips() {
   const avail = new Set(currentRows().map((r) => r.geo));
   $("#geo-chips").innerHTML = state.geos.map((g, i) => {
     const has = avail.has(g);
-    return `<span class="chip ${has ? "" : "nodata"}" title="${has ? "" : "No data for this place in this indicator"}">` +
-      `<i style="background:${has ? SERIES_COLORS[state.geos.filter((x) => avail.has(x)).indexOf(g) % SERIES_COLORS.length] : "transparent"}"></i>` +
+    const col = has ? SERIES_COLORS[state.geos.filter((x) => avail.has(x)).indexOf(g) % SERIES_COLORS.length] : "";
+    return `<span class="chip ${has ? "" : "nodata"}" style="${has ? `--cc:${col}` : ""}" title="${has ? "" : "No data for this place in this indicator"}">` +
+      `<i></i>` +
       `${esc(store.geoName(g))}<button type="button" data-rm="${esc(g)}" aria-label="Remove ${esc(store.geoName(g))}">×</button></span>`;
-  }).join("") + (state.geos.length > 1 ? `<button type="button" class="example" id="clear-geos">Clear</button>` : "");
+  }).join("") + (state.geos.length > 1 ? `<button type="button" class="chip-clear" id="clear-geos">Clear all</button>` : "");
   $$("[data-rm]").forEach((b) => b.addEventListener("click", () => {
     state.geos = state.geos.filter((g) => g !== b.dataset.rm);
     render();
@@ -407,7 +426,7 @@ function renderCard() {
     : "";
   $("#ind-card").innerHTML = `
     <div>
-      <h2>About this indicator</h2>
+      <h3>About this indicator</h3>
       <p class="desc">${esc(series.description || "No description provided by the source.")}</p>
       ${ind.m === "approximate" ? `<p><span class="badge">Related indicator</span> The SDG goal shown is an approximate thematic link made by this site, not an official UN mapping.</p>` : ""}
     </div>
@@ -493,73 +512,8 @@ function renderTree() {
   });
 }
 
-// ---------- ask ----------
-async function ask(question, opts = {}) {
-  const box = $("#answer");
-  box.hidden = false;
-  box.innerHTML = `<p class="interp">Looking that up…</p>`;
-  let res = null;
-  let viaApi = false;
-  if (CONFIG.apiUrl && !opts.indicator) {
-    try {
-      res = await askApi(CONFIG.apiUrl, question, { indicator: state.ind, geos: state.geos, y0: state.y0, y1: state.y1 });
-      viaApi = true;
-    } catch (e) {
-      console.warn("Chat API unavailable, using the built-in engine", e);
-    }
-  }
-  if (!res) res = await askLocal(store, question, opts);
-  if (!res.ok && !res.answer) {
-    box.innerHTML = `<div class="answer-body">${res.html}</div>`;
-    return;
-  }
-  if (viaApi) {
-    renderApiAnswer(box, res);
-  } else {
-    const c = res.citation;
-    box.innerHTML = `
-      <p class="interp">Showing <b>${res.interp}</b></p>
-      <div class="answer-body">${res.html}</div>
-      <p class="cite">Source: ${esc(c.source)}${c.org ? ` (${esc(c.org)})` : ""}, series ${esc(c.code)}${c.release ? `, release ${esc(c.release)}` : ""}.${res.flagged ? " Some values are flagged by the source, for example as estimates." : ""}</p>
-      ${res.alternatives?.length ? `<p class="alts">Not the right measure? ${res.alternatives.map((id) => `<button type="button" data-alt="${esc(id)}">${esc(store.byId.get(id)?.n || id)} (${SOURCE_NAMES[store.byId.get(id)?.s] || ""})</button>`).join("")}</p>` : ""}`;
-    $$("[data-alt]", box).forEach((b) => b.addEventListener("click", () => ask(question, { indicator: b.dataset.alt })));
-  }
-  const v = res.view || {};
-  const id = res.indicator || v.indicator;
-  if (id && store.byId.has(id)) {
-    state.dims = res.dims ?? v.dims ?? "";
-    if (v.geos?.length) state.geos = v.geos;
-    const ind = store.byId.get(id);
-    if (v.y0 || v.y1) {
-      state.y1 = Math.min(v.y1 || ind.y1, ind.y1);
-      state.y0 = Math.max(v.y0 || ind.y0, ind.y0);
-      if (state.y0 > state.y1) state.y0 = state.y1;
-    }
-    state.view = v.mode || "chart";
-    await selectIndicator(id, { keepGeos: true, keepYears: true, keepDims: true });
-  }
-}
-
-function renderApiAnswer(box, res) {
-  const cites = (res.citations || []).map((c) =>
-    `${esc(c.source)}, ${esc(c.name || "")} [${esc(c.code)}]${c.release ? `, release ${esc(c.release)}` : ""}`).join("; ");
-  box.innerHTML = `
-    <p class="interp ai-badge">Answered by the AI assistant, which can only use database tools. Questions are sent to a third-party language model.</p>
-    <div class="answer-body">${(res.answer || "").split(/\n{2,}/).map((p) => `<p>${esc(p)}</p>`).join("")}</div>
-    ${cites ? `<p class="cite">Sources: ${cites}</p>` : ""}`;
-}
-
 // ---------- controls ----------
 function bindControls() {
-  $("#ask-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const q = $("#ask-input").value.trim();
-    if (q) ask(q);
-  });
-  $$(".example").forEach((b) => b.addEventListener("click", () => {
-    $("#ask-input").value = b.textContent;
-    ask(b.textContent);
-  }));
   $("#ind-search").addEventListener("input", debounce(renderBrowser, 150));
 
   const gs = $("#geo-search");
@@ -698,6 +652,7 @@ function debounce(fn, ms) {
 // ---------- news ----------
 let news = null;
 const newsFilter = { kind: "all", sdg: null, event: null };
+let newsShown = 30;
 async function loadNews(quiet = false) {
   if (!news) {
     try {
@@ -726,7 +681,7 @@ function renderEvents() {
       <span class="status">${e.status === "live" ? "Happening now" : e.status === "upcoming" ? "Upcoming" : "Ended"}</span>
       <b><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.name)}</a></b>
       <span>${dateText(e.start)} – ${dateText(e.end)} · ${esc(e.place)}</span>
-      <button type="button" class="example" data-event="${esc(e.short)}">News about ${esc(e.short)}</button></li>`).join("");
+      <button type="button" class="ev-btn" data-event="${esc(e.short)}" aria-pressed="${newsFilter.event === e.short}">News about ${esc(e.short)}</button></li>`).join("");
   $$("[data-event]").forEach((b) => b.addEventListener("click", () => {
     newsFilter.event = newsFilter.event === b.dataset.event ? null : b.dataset.event;
     renderNewsFilters();
@@ -742,9 +697,9 @@ function renderNewsFilters() {
     kinds.map(([k, l]) => `<button type="button" data-kind="${k}" aria-pressed="${newsFilter.kind === k}">${l}</button>`).join("") +
     [...sdgs].sort((a, b) => a - b).map((g) => `<button type="button" class="sdg-f" data-sdg="${g}" aria-pressed="${newsFilter.sdg === g}"><i style="background:${SDG_COLORS[g]}"></i>SDG ${g}</button>`).join("") +
     (newsFilter.event ? `<button type="button" data-clear-event aria-pressed="true">${esc(newsFilter.event)} ×</button>` : "");
-  $$("[data-kind]").forEach((b) => b.addEventListener("click", () => { newsFilter.kind = b.dataset.kind; renderNewsFilters(); renderNews(); }));
-  $$("[data-sdg]").forEach((b) => b.addEventListener("click", () => { newsFilter.sdg = newsFilter.sdg === b.dataset.sdg ? null : b.dataset.sdg; renderNewsFilters(); renderNews(); }));
-  $("[data-clear-event]")?.addEventListener("click", () => { newsFilter.event = null; renderNewsFilters(); renderNews(); });
+  $$("[data-kind]").forEach((b) => b.addEventListener("click", () => { newsShown = 30; newsFilter.kind = b.dataset.kind; renderNewsFilters(); renderNews(); }));
+  $$("[data-sdg]").forEach((b) => b.addEventListener("click", () => { newsShown = 30; newsFilter.sdg = newsFilter.sdg === b.dataset.sdg ? null : b.dataset.sdg; renderNewsFilters(); renderNews(); }));
+  $("[data-clear-event]")?.addEventListener("click", () => { newsShown = 30; newsFilter.event = null; renderNewsFilters(); renderNews(); });
 }
 
 function renderNews() {
@@ -754,16 +709,25 @@ function renderNews() {
     (!newsFilter.sdg || (i.sdgs || []).includes(newsFilter.sdg)) &&
     (!newsFilter.event || i.event === newsFilter.event));
   const pinned = newsFilter.event ? [] : items.filter((i) => liveEvents.has(i.event)).slice(0, 3);
-  items = [...pinned, ...items.filter((i) => !pinned.includes(i))].slice(0, 150);
-  $("#news-list").innerHTML = items.length ? items.map((i) => `<li class="news-item ${pinned.includes(i) ? "pinned" : ""}">
+  items = [...pinned, ...items.filter((i) => !pinned.includes(i))];
+  const total = items.length;
+  items = items.slice(0, newsShown);
+  $("#news-list").innerHTML = items.length ? items.map((i) => `<li class="news-item ${pinned.includes(i) ? "pinned" : ""}" style="--nc:${(i.sdgs || []).length ? SDG_COLORS[i.sdgs[0]] : "var(--rule-strong)"}">
       <h3><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
-      <div class="meta"><span>${esc(i.source)}</span><span>${dateText(i.date)}</span>
+      <div class="meta">${pinned.includes(i) ? `<span class="now">Live conference</span>` : ""}<span>${esc(i.source)}</span><span>${dateText(i.date)}</span>
         ${i.event ? `<span class="ev">${esc(i.event)}</span>` : ""}
         ${(i.sdgs || []).length ? `<span class="sdgs">${i.sdgs.map((g) => `<b style="background:${SDG_COLORS[g]};color:${luminance(SDG_COLORS[g]) > 0.38 ? "#132A2E" : "#fff"}" title="SDG ${g}">${g}</b>`).join("")}</span>` : ""}
         ${(i.countries || []).length ? `<span>${i.countries.slice(0, 4).map((c) => esc(store.geoName(c))).join(", ")}</span>` : ""}
       </div>
       ${i.teaser ? `<p>${esc(i.teaser)}</p>` : ""}</li>`).join("")
     : `<li class="news-item"><p>No news matches these filters.</p></li>`;
+  if (total > newsShown) {
+    $("#news-list").insertAdjacentHTML("beforeend", `<li class="more"><button type="button" id="news-more">Show more headlines (${total - newsShown} left)</button></li>`);
+    $("#news-more").addEventListener("click", () => {
+      newsShown += 30;
+      renderNews();
+    });
+  }
 }
 
 // ---------- updates ----------
@@ -780,7 +744,7 @@ async function loadUpdates() {
       ${Object.entries(meta.sources).map(([k, s]) => `<tr><td><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a></td>
         <td class="${s.status === "ok" ? "ok" : s.status === "failed" ? "failed" : ""}">${s.status === "ok" ? "Checked" : s.status === "failed" ? "Update failed, previous data kept" : esc(s.status || "–")}</td>
         <td>${esc(s.release || "–")}</td><td>${(s.indicators ?? "–").toLocaleString?.("en") ?? s.indicators}</td><td>${(s.rows ?? 0).toLocaleString("en")}</td></tr>`).join("")}
-      </tbody></table><p class="page-lede">Last check ${new Date(meta.generated).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}. ${meta.rows.toLocaleString("en")} values across ${meta.indicators.toLocaleString("en")} indicators.</p>`;
+      </tbody></table><p class="status-note">Last check ${new Date(meta.generated).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}. ${meta.rows.toLocaleString("en")} values across ${meta.indicators.toLocaleString("en")} indicators.</p>`;
   }
   $("#changelog").innerHTML = log.length ? log.map((e) => `<li>
       <h3>${dateText(e.date)}</h3>
@@ -794,8 +758,6 @@ async function loadUpdates() {
 function renderAbout() {
   const m = store.meta;
   $("#about").innerHTML = `
-    <h1 class="page-title">About this explorer</h1>
-    <p class="page-lede">A free tool for researchers to find, compare and cite global sustainability data in one place.</p>
     <h2>What's inside</h2>
     <p>${m ? `${m.indicators.toLocaleString("en")} indicators and ${m.rows.toLocaleString("en")} values` : "Indicators"} from three open sources:</p>
     <ul>
@@ -805,8 +767,13 @@ function renderAbout() {
     </ul>
     <h2>How it stays up to date</h2>
     <p>A scheduled job checks every source each week and the news feeds every few hours. It only re-downloads series whose release has changed, validates the result, and keeps the last good copy if a source fails or looks wrong. The <a href="#updates">What's new</a> page lists every change.</p>
-    <h2>How answers are made</h2>
-    <p>The Ask box matches your question to an indicator, places and years, then computes the answer from the stored values. It never invents a number: every figure comes from a data row and carries its source, series code and release. If it picks the wrong measure, choose another from the list under the answer.</p>
+    <h2>How to use it</h2>
+    <ul>
+      <li>Pick a goal, then a target and an indicator, or search for one by name.</li>
+      <li>Add countries, regions or groups (LDCs, SIDS). Use "Browse by region" to add every country in a region at once.</li>
+      <li>Switch between chart, map and table. The map's play button steps through the years.</li>
+      <li>Use "Copy link" to share exactly what you are looking at, "Download CSV" for the values with their source columns, and "Copy citation" for your reference list.</li>
+    </ul>
     <h2>Things to keep in mind</h2>
     <ul>
       <li>Sources define indicators differently. The same topic (for example CO2 emissions) can appear from several sources with different methods; they are kept separate on purpose.</li>

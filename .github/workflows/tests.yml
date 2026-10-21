@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
-    paths: ["api/**", "pipeline/**"]
+    paths: ["pipeline/**"]
 
 jobs:
   test:
@@ -18,7 +18,3 @@ jobs:
         run: |
           pip install -r pipeline/requirements.txt
           cd pipeline && pytest -q
-      - name: API tests
-        run: |
-          pip install -r api/requirements.txt pytest pyyaml
-          cd api && pytest -q

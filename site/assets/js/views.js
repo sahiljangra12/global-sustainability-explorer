@@ -5,8 +5,8 @@ import { fmt, esc, isPercent, mixHex } from "./format.js";
 
 // Line colours for places: distinct, colour-blind-aware, and not the SDG palette
 // (SDG colours already mean "goal" in this interface).
-export const SERIES_COLORS = ["#1B6A8F", "#C2410C", "#6D28D9", "#0F766E", "#B91C1C", "#A16207",
-  "#4D7C0F", "#BE185D", "#334155", "#0369A1", "#7C2D12", "#15803D"];
+export const SERIES_COLORS = ["#2563EB", "#E8590C", "#9333EA", "#0D9488", "#DB2777", "#CA8A04",
+  "#16A34A", "#DC2626", "#0891B2", "#4F46E5", "#B45309", "#475569"];
 
 let world = null;
 async function worldMap() {
@@ -50,7 +50,7 @@ export function chart(el, { rows, geos, geoName, unit, y0, y1 }) {
   if (years.size === 1) {
     plot = Plot.plot({
       width, height: Math.max(160, order.length * 34 + 60), marginLeft: 160, marginRight: 72,
-      style: { fontFamily: "Hanken Grotesk, sans-serif", fontSize: "13px", color: ink, background: "transparent" },
+      style: { fontFamily: "Plus Jakarta Sans, sans-serif", fontSize: "13px", color: ink, background: "transparent" },
       x: { grid: true, label: axisLabel(unit), tickFormat: (d) => fmt(d) },
       y: { label: null },
       color,
@@ -64,12 +64,12 @@ export function chart(el, { rows, geos, geoName, unit, y0, y1 }) {
   } else {
     plot = Plot.plot({
       width, height: Math.min(520, Math.max(320, width * 0.48)), marginLeft: 64, marginRight: 24,
-      style: { fontFamily: "Hanken Grotesk, sans-serif", fontSize: "13px", color: ink, background: "transparent" },
+      style: { fontFamily: "Plus Jakarta Sans, sans-serif", fontSize: "13px", color: ink, background: "transparent" },
       x: { label: null, tickFormat: (d) => String(d), ticks: Math.max(2, Math.min(12, years.size, Math.floor(width / 70))) },
       y: { grid: true, label: axisLabel(unit), tickFormat: (d) => fmt(d), zero: data.every((d) => d.value >= 0) },
       color,
       marks: [
-        Plot.lineY(data, { x: "year", y: "value", stroke: "place", strokeWidth: 2, curve: "linear" }),
+        Plot.lineY(data, { x: "year", y: "value", stroke: "place", strokeWidth: 2.5, curve: "monotone-x" }),
         Plot.dot(data, { x: "year", y: "value", fill: "place", r: data.length > 400 ? 0 : 2.5 }),
         Plot.tip(data, Plot.pointer({ x: "year", y: "value", stroke: "place",
           title: (d) => `${d.place}\n${d.year}: ${fmt(d.value, unit)}${d.flag ? ` (${d.flag})` : ""}` })),
@@ -116,7 +116,7 @@ export async function map(el, { rows, year, geoByCode, unit, highlight }) {
   const plot = Plot.plot({
     width, height: width * 0.5,
     projection: "equal-earth",
-    style: { fontFamily: "Hanken Grotesk, sans-serif", fontSize: "12px", color: ink, background: "transparent" },
+    style: { fontFamily: "Plus Jakarta Sans, sans-serif", fontSize: "12px", color: ink, background: "transparent" },
     color: { type: "linear", domain: [q(0.02), q(0.98)], range: [wash, goalInk], clamp: true,
       legend: true, label: `${year}${unit ? ` · ${axisLabel(unit)}` : ""}`, tickFormat: (d) => fmt(d) },
     marks: [
