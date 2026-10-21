@@ -1,0 +1,24 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths: ["api/**", "pipeline/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Pipeline tests
+        run: |
+          pip install -r pipeline/requirements.txt
+          cd pipeline && pytest -q
+      - name: API tests
+        run: |
+          pip install -r api/requirements.txt pytest pyyaml
+          cd api && pytest -q

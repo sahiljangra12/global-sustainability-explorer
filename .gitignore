@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+prev/
+build/
+_site/
+build.log
+gse-data.tar.gz
+site/data/
+tools/vendor/node_modules/
+.DS_Store

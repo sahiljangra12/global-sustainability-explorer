@@ -1,0 +1,36 @@
+# UN sustainability conferences shown in the News tab's calendar.
+# While an event is running, news that mentions it is pinned to the top.
+# Dates verified Oct 2026; edit when new dates are announced.
+events:
+  - name: UNCCD COP17 (desertification)
+    short: UNCCD COP17
+    start: 2026-08-17
+    end: 2026-08-28
+    place: Ulaanbaatar, Mongolia
+    url: https://unric.org/en/unccd-cop17-to-be-held-in-ulaanbaatar-mongolia-from-17-28-august-2026/
+    keywords: ["UNCCD COP17", "desertification COP", "Ulaanbaatar"]
+    sdg: ["15"]
+  - name: UN Biodiversity Conference (CBD COP17)
+    short: CBD COP17
+    start: 2026-10-19
+    end: 2026-10-30
+    place: Yerevan, Armenia
+    url: https://www.cbd.int/doc/notifications/2026/ntf-2026-016-cop17-hls-en.pdf
+    keywords: ["COP17", "CBD COP", "biodiversity conference", "Yerevan", "Armenia talks"]
+    sdg: ["14", "15"]
+  - name: UN Climate Change Conference (COP31)
+    short: COP31
+    start: 2026-11-09
+    end: 2026-11-20
+    place: Antalya, Türkiye
+    url: https://en.wikipedia.org/wiki/2026_United_Nations_Climate_Change_Conference
+    keywords: ["COP31", "Antalya", "UN climate summit", "climate talks"]
+    sdg: ["13"]
+  - name: 2026 UN Water Conference
+    short: UN Water Conference
+    start: 2026-12-08
+    end: 2026-12-10
+    place: Abu Dhabi, United Arab Emirates
+    url: https://blue-community.net/2026/05/new-dates-2026-un-water-conference/
+    keywords: ["UN Water Conference", "water conference", "Abu Dhabi"]
+    sdg: ["6"]

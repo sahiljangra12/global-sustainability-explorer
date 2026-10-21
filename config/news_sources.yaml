@@ -1,0 +1,28 @@
+# News feeds pulled into the explorer's News tab.
+# Add or remove feeds here; the pipeline tolerates feeds that are down.
+# kind: "official" (UN system) or "specialist" (independent climate/environment newsrooms)
+feeds:
+  - name: UN Sustainable Development
+    url: https://www.un.org/sustainabledevelopment/feed/
+    kind: official
+  - name: UN News · Climate and Environment
+    url: https://news.un.org/feed/subscribe/en/news/topic/climate-change/feed/rss.xml
+    kind: official
+  - name: UN News · SDGs
+    url: https://news.un.org/feed/subscribe/en/news/topic/sdgs/feed/rss.xml
+    kind: official
+  - name: IPCC
+    url: https://www.ipcc.ch/feed/
+    kind: official
+  - name: WMO
+    url: https://wmo.int/rss.xml
+    kind: official
+  - name: Carbon Brief
+    url: https://www.carbonbrief.org/feed/
+    kind: specialist
+  - name: Climate Home News
+    url: https://www.climatechangenews.com/feed/
+    kind: specialist
+  - name: Mongabay
+    url: https://news.mongabay.com/feed/
+    kind: specialist
