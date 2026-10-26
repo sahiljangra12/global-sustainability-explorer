@@ -2,7 +2,7 @@
 
 **Live site: https://sahiljangra12.github.io/global-sustainability-explorer/**
 
-A free tool for researchers to explore, compare and cite global sustainability data for all 17 Sustainable Development Goals in one place, with a live sustainability news feed.
+A free tool for researchers to explore, compare and cite global sustainability data for all 17 Sustainable Development Goals in one place, with a live sustainability news feed. The site opens on a turning globe coloured by real data (renewable energy share, UN SDG 7.2.1).
 
 - **One place for the main open datasets:** the UN SDG Global Database (all 17 goals, with breakdowns by sex, age and location), World Bank WDI (energy, environment, climate, poverty, agriculture) and Our World in Data (CO2, greenhouse gases, energy).
 - **Drill down:** Goal → target → indicator → breakdown. Pick places from World → continent → sub-region → country, or groups such as LDCs and SIDS, and set any year range.
@@ -25,7 +25,7 @@ A free tool for researchers to explore, compare and cite global sustainability d
 | Folder | What it is |
 | --- | --- |
 | `pipeline/` | Python package `gse`: source connectors, geography, validation, change detection, export, news. |
-| `site/` | The website: plain HTML, CSS and JavaScript. Observable Plot is bundled in `site/assets/vendor`, so there is no CDN dependency. |
+| `site/` | The website: plain HTML, CSS and JavaScript, set in the D-DIN typeface (SIL OFL, in `site/assets/fonts`). Observable Plot and d3-geo are bundled in `site/assets/vendor`, so there is no CDN dependency. |
 | `config/` | `news_sources.yaml` (RSS feeds) and `events.yaml` (UN conference dates). Edit these to add feeds or events. |
 | `.github/workflows/` | `update.yml`: the scheduled update and deploy. `tests.yml`: the tests. |
 

@@ -3,12 +3,13 @@
   "private": true,
   "description": "Rebuilds site/assets/vendor/vis.bundle.js (Observable Plot + topojson-client) so the site needs no CDN.",
   "scripts": {
-    "build": "esbuild entry.js --bundle --format=esm --minify --legal-comments=eof --outfile=../../site/assets/vendor/vis.bundle.js && cp node_modules/world-atlas/countries-110m.json ../../site/assets/vendor/"
+    "build": "esbuild entry.js --bundle --format=esm --minify --outfile=../../site/assets/vendor/vis.bundle.js && cp node_modules/world-atlas/countries-110m.json ../../site/assets/vendor/"
   },
   "devDependencies": {
     "@observablehq/plot": "0.6.16",
     "topojson-client": "3.1.0",
     "world-atlas": "2.0.2",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "d3-geo": "^3.1.0"
   }
 }

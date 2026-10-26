@@ -3,13 +3,15 @@
 import { Plot, feature } from "../vendor/vis.bundle.js";
 import { fmt, esc, isPercent, mixHex } from "./format.js";
 
-// Line colours for places: distinct, colour-blind-aware, and not the SDG palette
-// (SDG colours already mean "goal" in this interface).
-export const SERIES_COLORS = ["#2563EB", "#E8590C", "#9333EA", "#0D9488", "#DB2777", "#CA8A04",
-  "#16A34A", "#DC2626", "#0891B2", "#4F46E5", "#B45309", "#475569"];
+// Line colours for places on the black background: bright, distinct, and not the SDG
+// palette (SDG colours already mean "goal" in this interface).
+export const SERIES_COLORS = ["#60A5FA", "#FB923C", "#C084FC", "#2DD4BF", "#F472B6", "#FACC15",
+  "#4ADE80", "#F87171", "#22D3EE", "#A5B4FC", "#FDBA74", "#CBD5E1"];
+
+const FONT = "D-DIN, Arial Narrow, sans-serif";
 
 let world = null;
-async function worldMap() {
+export async function worldMap() {
   if (!world) {
     world = fetch(new URL("../vendor/countries-110m.json", import.meta.url))
       .then((r) => r.json())
@@ -50,7 +52,7 @@ export function chart(el, { rows, geos, geoName, unit, y0, y1 }) {
   if (years.size === 1) {
     plot = Plot.plot({
       width, height: Math.max(160, order.length * 34 + 60), marginLeft: 160, marginRight: 72,
-      style: { fontFamily: "Plus Jakarta Sans, sans-serif", fontSize: "13px", color: ink, background: "transparent" },
+      style: { fontFamily: FONT, fontSize: "13px", color: ink, background: "transparent" },
       x: { grid: true, label: axisLabel(unit), tickFormat: (d) => fmt(d) },
       y: { label: null },
       color,
@@ -64,7 +66,7 @@ export function chart(el, { rows, geos, geoName, unit, y0, y1 }) {
   } else {
     plot = Plot.plot({
       width, height: Math.min(520, Math.max(320, width * 0.48)), marginLeft: 64, marginRight: 24,
-      style: { fontFamily: "Plus Jakarta Sans, sans-serif", fontSize: "13px", color: ink, background: "transparent" },
+      style: { fontFamily: FONT, fontSize: "13px", color: ink, background: "transparent" },
       x: { label: null, tickFormat: (d) => String(d), ticks: Math.max(2, Math.min(12, years.size, Math.floor(width / 70))) },
       y: { grid: true, label: axisLabel(unit), tickFormat: (d) => fmt(d), zero: data.every((d) => d.value >= 0) },
       color,
@@ -105,27 +107,27 @@ export async function map(el, { rows, year, geoByCode, unit, highlight }) {
     el.innerHTML = `<p class="msg">No country values for ${year}.</p>`;
     return;
   }
-  const goal = document.documentElement.dataset.goalHex || "#19486A";
-  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-  const goalInk = dark ? mixHex(goal, "#ffffff", 0.75) : mixHex(goal, "#0b1a1c", 0.6);
-  const wash = dark ? mixHex(goal, "#142427", 0.18) : mixHex(goal, "#ffffff", 0.12);
+  const goal = document.documentElement.dataset.goalHex || "#0A97D9";
+  const high = mixHex(goal, "#F0F0FA", 0.45);
+  const low = mixHex(goal, "#0B0B0E", 0.4);
   const ink = cssVar("--ink");
   const rule = cssVar("--rule");
+  const empty = "#1A1B22";
   const vals = [...byM49.values()].map((d) => d.v).sort((a, b) => a - b);
   const q = (p) => vals[Math.min(vals.length - 1, Math.floor(p * (vals.length - 1)))];
   const plot = Plot.plot({
     width, height: width * 0.5,
     projection: "equal-earth",
-    style: { fontFamily: "Plus Jakarta Sans, sans-serif", fontSize: "12px", color: ink, background: "transparent" },
-    color: { type: "linear", domain: [q(0.02), q(0.98)], range: [wash, goalInk], clamp: true,
+    style: { fontFamily: FONT, fontSize: "12px", color: ink, background: "transparent" },
+    color: { type: "linear", domain: [q(0.02), q(0.98)], range: [low, high], clamp: true,
       legend: true, label: `${year}${unit ? ` · ${axisLabel(unit)}` : ""}`, tickFormat: (d) => fmt(d) },
     marks: [
       Plot.sphere({ stroke: rule }),
-      Plot.geo(features.features, { fill: rule, stroke: "white", strokeWidth: 0.4 }),
+      Plot.geo(features.features, { fill: empty, stroke: "#000", strokeWidth: 0.5 }),
       Plot.geo(features.features.filter((f) => byM49.has(f.id)), {
         fill: (f) => byM49.get(f.id)?.v ?? null,
-        stroke: (f) => (highlight?.has(byM49.get(f.id)?.code) ? ink : "white"),
-        strokeWidth: (f) => (highlight?.has(byM49.get(f.id)?.code) ? 1.5 : 0.4),
+        stroke: (f) => (highlight?.has(byM49.get(f.id)?.code) ? ink : "#000"),
+        strokeWidth: (f) => (highlight?.has(byM49.get(f.id)?.code) ? 1.5 : 0.5),
       }),
       Plot.tip(features.features, Plot.pointer(Plot.geoCentroid({
         title: (f) => {

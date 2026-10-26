@@ -1,5 +1,6 @@
 import { Store, SDG_COLORS, SOURCE_NAMES, normalize, dimsText, parseDims, dimLabel } from "./data.js";
 import { chart, map, table, bestMapYear, SERIES_COLORS } from "./views.js";
+import { startGlobe } from "./globe.js";
 import { fmt, esc, csvEscape, download, dateText, luminance } from "./format.js";
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -41,18 +42,78 @@ init().catch((e) => {
 async function init() {
   store = await new Store().init();
   $("#ind-search").placeholder = `Search ${store.indicators.length.toLocaleString("en")} indicators`;
-  const nCountries = store.geo.filter((g) => g.type === "country").length;
-  if (store.meta) {
-    $("#hero-lede").innerHTML = `<b>${store.meta.indicators.toLocaleString("en")} indicators</b> and <b>${store.meta.rows.toLocaleString("en")} values</b> for <b>${nCountries} countries and territories</b>, from the UN SDG Global Database, the World Bank and Our World in Data. Checked for new releases every few hours. Pick a goal to start.`;
-  }
+  renderStats();
   if (store.meta?.generated) $("#build-time").textContent = `Data last built ${dateText(store.meta.generated)}.`;
   renderGoalStrip();
   bindControls();
+  bindChrome();
+  heroGlobe().catch((e) => console.warn("Globe unavailable", e));
   readHash();
   window.addEventListener("hashchange", () => {
     if (!suppressHash) readHash();
   });
   loadNews(true);
+}
+
+// ---------- hero ----------
+function compact(n) {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1).replace(/\.0$/, "")}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M`;
+  return n.toLocaleString("en");
+}
+
+function renderStats() {
+  const m = store.meta;
+  const countries = store.geo.filter((g) => g.type === "country").length;
+  const sources = m ? Object.keys(m.sources || {}).length : 3;
+  const vals = [
+    ["Indicators", store.indicators.length.toLocaleString("en")],
+    ["Values", m ? compact(m.rows) : "–"],
+    ["Countries and territories", String(countries)],
+    ["Open data sources", String(sources)],
+  ];
+  $("#stats").innerHTML = vals.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+}
+
+// The globe is coloured by the renewable energy share (SDG 7.2.1): real data, latest
+// well-covered year.
+async function heroGlobe() {
+  const id = ["unsdg:EG_FEC_RNEW", "wdi:EG.FEC.RNEW.ZS", "owid:renewables_share_energy"].find((x) => store.byId.has(x));
+  let valueByM49 = new Map();
+  if (id) {
+    const s = await store.series(id);
+    const countries = new Set(store.geo.filter((g) => g.type === "country").map((g) => g.code));
+    const rows = s._rows.filter((r) => r.dims === "" && countries.has(r.geo));
+    const year = bestMapYear(rows, countries, 1990, 2100);
+    rows.filter((r) => r.year === year).forEach((r) => {
+      const m49 = store.geoByCode.get(r.geo)?.m49;
+      if (m49) valueByM49.set(String(m49).padStart(3, "0"), r.value);
+    });
+    const ind = store.byId.get(id);
+    $("#globe-cap-text").textContent = `Renewable energy share of final energy use, ${year}. ${SOURCE_NAMES[ind.s]}${ind.i?.length ? `, indicator ${ind.i[0]}` : ""}.`;
+    $("#ramp-hi").textContent = "90%+";
+    $("#globe-cap").hidden = false;
+  }
+  await startGlobe($("#globe"), { valueByM49, max: 90 });
+}
+
+function bindChrome() {
+  const top = $("#top");
+  const onScroll = () => top.classList.toggle("solid", window.scrollY > 24 || state.tab !== "explore");
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  bindChrome.refresh = onScroll;
+  const btn = $(".menu-btn");
+  const setMenu = (open) => {
+    document.body.classList.toggle("menu-open", open);
+    btn.setAttribute("aria-expanded", String(open));
+  };
+  btn.addEventListener("click", () => setMenu(!document.body.classList.contains("menu-open")));
+  $$(".tabs a").forEach((a) => a.addEventListener("click", () => setMenu(false)));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setMenu(false); });
+  $("#hero-cta").addEventListener("click", () => {
+    $("#goals").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  });
 }
 
 // ---------- URL state ----------
@@ -113,6 +174,8 @@ function showTab(tab) {
   if (tab === "news") loadNews();
   if (tab === "updates") loadUpdates();
   if (tab === "about") renderAbout();
+  if (tab !== "explore") window.scrollTo(0, 0);
+  bindChrome.refresh?.();
 }
 
 // ---------- goal strip ----------
@@ -120,17 +183,16 @@ function renderGoalStrip() {
   const el = $("#goal-strip");
   const counts = new Map();
   store.indicators.forEach((i) => (i.g || []).forEach((g) => counts.set(g, (counts.get(g) || 0) + 1)));
-  const textOn = (hex) => (luminance(hex) > 0.38 ? "#14213D" : "#fff");
   el.innerHTML =
     `<button class="goal all" role="tab" aria-selected="${!state.goal}" data-goal="">` +
-    `<span class="tint"></span><span class="num">All</span><span class="gname">All 17 goals</span>` +
+    `<span class="num">All</span><span class="gname">All 17 goals</span>` +
     `<span class="count">${store.indicators.length.toLocaleString("en")} indicators</span></button>` +
     store.goals.map((g) => {
       const c = SDG_COLORS[g.code];
       const n = counts.get(g.code) || 0;
-      return `<button class="goal" role="tab" style="--c:${c};color:${textOn(c)}" aria-selected="${state.goal === g.code}"
+      return `<button class="goal ${luminance(c) > 0.38 ? "on-light" : ""}" role="tab" style="--c:${c}" aria-selected="${state.goal === g.code}"
         data-goal="${g.code}" title="Goal ${g.code}: ${esc(g.title || g.name)}">
-        <span class="num">${g.code}</span><span class="gname">${esc(g.name)}</span>
+        <span class="num">${String(g.code).padStart(2, "0")}</span><span class="gname">${esc(g.name)}</span>
         <span class="count">${n ? `${n} indicator${n === 1 ? "" : "s"}` : "Coming with the next update"}</span></button>`;
     }).join("");
   $$(".goal", el).forEach((b) => b.addEventListener("click", () => {
@@ -158,7 +220,7 @@ function pickGoalDefault(goal) {
 }
 
 function setGoalTint(goal) {
-  const hex = SDG_COLORS[goal] || "#19486A";
+  const hex = SDG_COLORS[goal] || "#9C9CA8"; // context indicators (no goal): neutral grey
   document.documentElement.style.setProperty("--goal", hex);
   document.documentElement.dataset.goalHex = hex;
 }
@@ -248,7 +310,7 @@ async function selectIndicator(id, { keepGeos = true, keepYears = false, keepDim
   if (!id) return;
   const ind = store.byId.get(id);
   state.ind = id;
-  setGoalTint(state.goal || (ind.g || [])[0] || "17");
+  setGoalTint(state.goal || (ind.g || [])[0]);
   $("#ind-title").textContent = ind.n;
   $("#view").innerHTML = `<p class="msg">Loading…</p>`;
   try {
@@ -303,7 +365,6 @@ function render() {
   badge.innerHTML = goalInfo
     ? `Goal ${goal}: ${esc(goalInfo.name)}${ind.i?.length ? ` · indicator ${esc(ind.i.join(", "))}` : ""}${ind.m === "approximate" ? " · related indicator" : ""}`
     : "Context indicator";
-  badge.classList.toggle("light", !!goalInfo && luminance(SDG_COLORS[goal]) > 0.38);
   badge.classList.toggle("neutral", !goalInfo);
   $("#ind-title").textContent = ind.n;
   $("#ind-meta").textContent = [
@@ -433,7 +494,7 @@ function renderCard() {
     <div>
       <dl>
         <dt>Source</dt><dd>${esc(cite.source)}${cite.url ? ` · <a href="${esc(cite.url)}" target="_blank" rel="noopener">source page</a>` : ""}</dd>
-        ${series.source_org ? `<dt>Produced by</dt><dd>${esc(series.source_org)}</dd>` : ""}
+        ${series.source_org ? `<dt>Produced by</dt><dd>${esc([...new Set(series.source_org.split(/\s*;\s*/).map((x) => x.trim()).filter(Boolean))].join("; "))}</dd>` : ""}
         <dt>Code</dt><dd>${esc(ind.c)}</dd>
         <dt>Release</dt><dd>${esc(series.release || "–")}</dd>
         <dt>Coverage</dt><dd>${ind.ng} places, ${ind.y0}–${ind.y1}, ${ind.nr.toLocaleString("en")} values</dd>
@@ -712,11 +773,11 @@ function renderNews() {
   items = [...pinned, ...items.filter((i) => !pinned.includes(i))];
   const total = items.length;
   items = items.slice(0, newsShown);
-  $("#news-list").innerHTML = items.length ? items.map((i) => `<li class="news-item ${pinned.includes(i) ? "pinned" : ""}" style="--nc:${(i.sdgs || []).length ? SDG_COLORS[i.sdgs[0]] : "var(--rule-strong)"}">
+  $("#news-list").innerHTML = items.length ? items.map((i) => `<li class="news-item ${pinned.includes(i) ? "pinned" : ""}" style="--nc:${(i.sdgs || []).length ? SDG_COLORS[i.sdgs[0]] : "var(--dim)"}">
       <h3><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
       <div class="meta">${pinned.includes(i) ? `<span class="now">Live conference</span>` : ""}<span>${esc(i.source)}</span><span>${dateText(i.date)}</span>
         ${i.event ? `<span class="ev">${esc(i.event)}</span>` : ""}
-        ${(i.sdgs || []).length ? `<span class="sdgs">${i.sdgs.map((g) => `<b style="background:${SDG_COLORS[g]};color:${luminance(SDG_COLORS[g]) > 0.38 ? "#132A2E" : "#fff"}" title="SDG ${g}">${g}</b>`).join("")}</span>` : ""}
+        ${(i.sdgs || []).length ? `<span class="sdgs">${i.sdgs.map((g) => `<b style="background:${SDG_COLORS[g]};color:${luminance(SDG_COLORS[g]) > 0.38 ? "#0B0B0E" : "#fff"}" title="SDG ${g}">${g}</b>`).join("")}</span>` : ""}
         ${(i.countries || []).length ? `<span>${i.countries.slice(0, 4).map((c) => esc(store.geoName(c))).join(", ")}</span>` : ""}
       </div>
       ${i.teaser ? `<p>${esc(i.teaser)}</p>` : ""}</li>`).join("")
@@ -766,7 +827,7 @@ function renderAbout() {
       <li><a href="https://ourworldindata.org">Our World in Data</a>: CO2, greenhouse-gas and energy datasets.</li>
     </ul>
     <h2>How it stays up to date</h2>
-    <p>A scheduled job checks every source each week and the news feeds every few hours. It only re-downloads series whose release has changed, validates the result, and keeps the last good copy if a source fails or looks wrong. The <a href="#updates">What's new</a> page lists every change.</p>
+    <p>A scheduled job checks every source and the news feeds every three hours. It only re-downloads series whose release has changed, validates the result, and keeps the last good copy if a source fails or looks wrong. The <a href="#updates">What's new</a> page lists every change.</p>
     <h2>How to use it</h2>
     <ul>
       <li>Pick a goal, then a target and an indicator, or search for one by name.</li>

@@ -5,38 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Global Sustainability Explorer</title>
   <meta name="description" content="Explore, compare and cite global sustainability data for all 17 SDGs: UN SDG indicators, World Bank and Our World in Data, updated automatically, with live sustainability news.">
-  <meta name="theme-color" content="#FFFFFF">
+  <meta name="theme-color" content="#000000">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+  <link rel="preload" href="assets/fonts/D-DIN-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/D-DIN.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="top">
+  <header class="top" id="top">
     <div class="wrap top-row">
-      <a class="brand" href="#explore" aria-label="Global Sustainability Explorer, home">
-        <svg viewBox="0 0 32 32" aria-hidden="true" class="brand-mark"><use href="assets/favicon.svg#mark"/></svg>
-        <span>Global Sustainability Explorer</span>
-      </a>
-      <nav class="tabs" aria-label="Sections">
+      <a class="brand" href="#explore" aria-label="Global Sustainability Explorer, home"><span class="brand-a">Global </span>Sustainability Explorer</a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav"><span class="sr">Menu</span><i></i><i></i><i></i></button>
+      <nav class="tabs" id="site-nav" aria-label="Sections">
         <a href="#explore" data-tab="explore">Explore</a>
         <a href="#news" data-tab="news">News <span class="live-dot" hidden title="A UN conference is happening now"></span></a>
         <a href="#updates" data-tab="updates">What's new</a>
         <a href="#about" data-tab="about">About</a>
       </nav>
     </div>
-    <div class="spectrum" aria-hidden="true"></div>
   </header>
 
   <main id="main">
     <!-- EXPLORE -->
     <section id="tab-explore" class="tab" aria-label="Explore data">
-      <section class="hero">
+      <section class="hero" aria-label="Introduction">
+        <canvas id="globe" class="globe" aria-hidden="true"></canvas>
+        <div class="hero-shade" aria-hidden="true"></div>
+        <div class="wrap hero-inner">
+          <p class="kicker">Open data for the Sustainable Development Goals</p>
+          <h1 class="hero-title">Seventeen goals.<br>Every country.</h1>
+          <p class="hero-lede">Official SDG indicators, World Bank and Our World in Data series in one place, checked for new releases every few hours.</p>
+          <button class="btn" type="button" id="hero-cta">Explore the data</button>
+        </div>
+        <figure class="globe-cap" id="globe-cap" hidden>
+          <figcaption id="globe-cap-text"></figcaption>
+          <div class="ramp" aria-hidden="true"><i></i><span>0%</span><span id="ramp-hi">90%</span></div>
+        </figure>
+      </section>
+
+      <section class="stats" aria-label="At a glance">
         <div class="wrap">
-          <h1 class="hero-title">Seventeen goals.<br>Every country. One place.</h1>
-          <p class="hero-lede" id="hero-lede">Official SDG indicators, World Bank and Our World in Data series, checked for new releases every few hours. Pick a goal to start.</p>
+          <dl class="stat-row" id="stats">
+            <div><dt>Indicators</dt><dd>&nbsp;</dd></div>
+            <div><dt>Values</dt><dd>&nbsp;</dd></div>
+            <div><dt>Countries and territories</dt><dd>&nbsp;</dd></div>
+            <div><dt>Open data sources</dt><dd>3</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="goals-sec" id="goals" aria-labelledby="goals-h">
+        <div class="wrap">
+          <div class="sec-head">
+            <h2 class="sec-title" id="goals-h">Choose a goal</h2>
+            <p class="sec-lede">Each goal opens its targets and indicators below.</p>
+          </div>
           <div class="goal-grid" role="tablist" aria-label="Sustainable Development Goals" id="goal-strip"></div>
         </div>
       </section>
@@ -136,7 +160,7 @@
     <section id="tab-updates" class="tab" hidden aria-label="What's new in the data">
       <div class="page-band">
         <div class="wrap">
-          <h1 class="page-title">What's new in the data</h1>
+          <h1 class="page-title">What's new</h1>
           <p class="page-lede">Every source is checked on a schedule and only what changed is downloaded again. Each entry below is one update.</p>
         </div>
       </div>
@@ -150,7 +174,7 @@
     <section id="tab-about" class="tab" hidden aria-label="About">
       <div class="page-band">
         <div class="wrap">
-          <h1 class="page-title">About this explorer</h1>
+          <h1 class="page-title">About</h1>
           <p class="page-lede">A free tool for researchers to find, compare and cite global sustainability data in one place.</p>
         </div>
       </div>
@@ -161,9 +185,12 @@
   <footer class="foot">
     <div class="spectrum" aria-hidden="true"></div>
     <div class="wrap foot-row">
-      <p>Built by Sahil. Data: UN SDG Global Database, World Bank WDI and Our World in Data, each under its own licence. <a href="https://github.com/sahiljangra12/global-sustainability-explorer">Source code</a></p>
-      <p id="build-time"></p>
+      <span>Global Sustainability Explorer © 2026, built by Sahil</span>
+      <a href="https://github.com/sahiljangra12/global-sustainability-explorer">Source code</a>
+      <a href="#about">Data sources</a>
+      <a href="#updates">What's new</a>
     </div>
+    <p class="wrap foot-note"><span id="build-time"></span> Data: UN SDG Global Database, World Bank WDI and Our World in Data, each under its own licence.</p>
   </footer>
 
   <script type="module" src="assets/js/main.js"></script>
