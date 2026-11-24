@@ -370,3 +370,12 @@ table.data tbody tr:hover td, table.data tbody tr:hover th { background: var(--r
   html { scroll-behavior: auto; }
   * { transition: none !important; animation: none !important; }
 }
+
+/* Phones: finger-sized controls and readable small print */
+@media (max-width: 700px) {
+  .brand { display: inline-flex; align-items: center; min-height: 44px; }
+  .seg button, .actions button, .presets button, .map-controls button { min-height: 44px; }
+  .actions button { font-size: 0.75rem; }
+  .foot-row { font-size: 0.75rem; }
+  .foot-row a { display: inline-flex; align-items: center; min-height: 44px; }
+}
